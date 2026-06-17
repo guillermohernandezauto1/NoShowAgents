@@ -1305,8 +1305,7 @@ function renderProblemOverall(rows, wrap) {
   const totalReached = sumField(rows, 'reached_yes');
   const pbTotals = PB_COLS.map(c => sumField(rows,c));
   const pbGrand  = pbTotals.reduce((s,v)=>s+v, 0);
-  document.getElementById('kpi-pb-rate').textContent  = fmtPct(pbCount, totalReached);
-  document.getElementById('kpi-pb-count').textContent = fmtNum(pbGrand);
+  // kpi-pb-rate and kpi-pb-count elements removed from HTML — skip update
   mkChart('chart-pb', {
     type: 'bar',
     data: {
