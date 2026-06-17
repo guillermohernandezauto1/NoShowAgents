@@ -301,6 +301,7 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
         <button class="ctrl-btn active" id="problem-v-overall"  onclick="setCView('problem','overall')">Overall</button>
         <button class="ctrl-btn"        id="problem-v-country"  onclick="setCView('problem','country')">By Country</button>
         <button class="ctrl-btn"        id="problem-v-agent"    onclick="setCView('problem','agent')">Top Agents</button>
+        <button class="ctrl-btn"        id="problem-v-mix"      onclick="setCView('problem','mix')">Agent Mix</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="problem-v-table"    onclick="setCView('problem','table')">Table</button>
       </div>
@@ -339,6 +340,18 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- 4b: Problem at Branch — Agent Mix (separate full-width card) -->
+  <div class="chart-card full">
+    <div class="card-header">
+      <div class="card-title">Problem Type Mix per Agent</div>
+      <div style="font-size:11px;opacity:.45">Each bar = that agent's % breakdown across all 8 branch problem types · Hover for team avg comparison</div>
+    </div>
+    <div id="pb-mix-chart-wrap" class="chart-inner" style="height:480px">
+      <canvas id="chart-pb-mix"></canvas>
+    </div>
+    <div class="chart-note" id="pb-mix-note"></div>
   </div>
 
   <!-- 5: Rescheduled % -->
@@ -490,8 +503,8 @@ const TOP_N = 15; // agents shown in "Top Agents" view
 let S = {
   tab: 'monthly',
   years: [], countries: [], agents: [],
-  monthFrom: 1, monthTo: 12,
-  weekFrom: 1, weekTo: 52,
+  monthPeriodFrom: 0, monthPeriodTo: 999999,  // overridden by buildMonthSelects
+  weekPeriodFrom:  0, weekPeriodTo:  999999,  // overridden by buildWeekSelects
   reasonView: 'pie',
   sortCol: 'total_submissions', sortDir: -1
 };
@@ -520,9 +533,9 @@ function filtered() {
     if (S.countries.length && !S.countries.includes(r.country)) return false;
     if (S.agents.length   && !S.agents.includes(r.agent_name)) return false;
     if (S.tab === 'monthly') {
-      if (r.month < S.monthFrom || r.month > S.monthTo) return false;
+      if ((r.year*100+r.month) < S.monthPeriodFrom || (r.year*100+r.month) > S.monthPeriodTo) return false;
     } else {
-      if (r.week < S.weekFrom || r.week > S.weekTo) return false;
+      if ((r.year*100+r.week) < S.weekPeriodFrom || (r.year*100+r.week) > S.weekPeriodTo) return false;
     }
     return true;
   });
@@ -585,7 +598,7 @@ const C_MAP = {
   reason:  { canvas: 'reason-chart-wrap',  table: 'reason-tbl-wrap',  note: 'reason-note',
              modes: ['overall','country','agent','table'], subtoggle: 'reason-subtoggle' },
   problem: { canvas: 'problem-chart-wrap', table: 'problem-tbl-wrap', note: 'problem-note',
-             modes: ['overall','country','agent','table'], kpi: 'problem-kpi-wrap' }
+             modes: ['overall','country','agent','mix','table'], kpi: 'problem-kpi-wrap' }
 };
 
 function setCView(chart, mode) {
@@ -707,13 +720,15 @@ function buildWeekSelects() {
 function onMonthRange() {
   const f = document.getElementById('month-from').value.split('-').map(Number);
   const t = document.getElementById('month-to').value.split('-').map(Number);
-  S.monthFrom = f[1]; S.monthTo = t[1];
+  S.monthPeriodFrom = f[0]*100 + f[1];  // year*100 + month
+  S.monthPeriodTo   = t[0]*100 + t[1];
   render();
 }
 function onWeekRange() {
   const f = document.getElementById('week-from').value.split('-').map(Number);
   const t = document.getElementById('week-to').value.split('-').map(Number);
-  S.weekFrom = f[1]; S.weekTo = t[1];
+  S.weekPeriodFrom = f[0]*100 + f[1];  // year*100 + week
+  S.weekPeriodTo   = t[0]*100 + t[1];
   render();
 }
 
@@ -1134,9 +1149,109 @@ function renderReasonAgents(rows, wrap) {
 function renderProblemChart(rows) {
   const mode = CV.problem || 'overall';
   const wrap = document.getElementById('problem-chart-wrap');
-  if (mode === 'overall')      renderProblemOverall(rows, wrap);
+  if      (mode === 'overall') renderProblemOverall(rows, wrap);
   else if (mode === 'country') renderProblemByGroup(rows, wrap, 'country');
   else if (mode === 'agent')   renderProblemByGroup(rows, wrap, 'agent');
+  else if (mode === 'mix')     renderProblemMix(rows, wrap);
+}
+
+// ============================================================
+// STANDALONE: Problem Type Mix per Agent (full-width card)
+// ============================================================
+function renderProblemMixStandalone(rows) {
+  const wrap = document.getElementById('pb-mix-chart-wrap');
+  const byAgent = aggByAgent(rows)
+    .map(a => ({ ...a, pbTotal: PB_COLS.reduce((s,c) => s+(a[c]||0), 0) }))
+    .filter(a => a.pbTotal > 0)
+    .sort((a,b) => b.pbTotal - a.pbTotal);
+
+  const teamTotal = byAgent.reduce((s,a) => s+a.pbTotal, 0);
+  // Team-average % per type
+  const teamAvg = PB_COLS.map(col => teamTotal ? byAgent.reduce((s,a)=>s+(a[col]||0),0)/teamTotal*100 : 0);
+
+  const h = Math.max(400, byAgent.length * 30);
+  wrap.style.height = h + 'px';
+  document.getElementById('pb-mix-note').textContent =
+    byAgent.length === 0 ? 'No branch problems recorded in current filter.' : '';
+
+  if (!byAgent.length) { if (CH['chart-pb-mix']) CH['chart-pb-mix'].destroy(); return; }
+
+  const datasets = PB_COLS.map((col, i) => ({
+    label: PB_LABELS[i],
+    data: byAgent.map(a => a.pbTotal ? +(a[col]/a.pbTotal*100).toFixed(2) : 0),
+    backgroundColor: PB_COLORS[i],
+    stack: 's'
+  }));
+
+  mkChart('chart-pb-mix', {
+    type: 'bar',
+    data: { labels: byAgent.map(a => trunc(a.agent, 26)), datasets },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, beginAtZero: true, max: 100,
+             ticks: { callback: v => v+'%' }, grid: { color:'rgba(128,128,128,.1)' } },
+        y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
+      },
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => {
+          const a = byAgent[ctx.dataIndex];
+          const col = PB_COLS[ctx.datasetIndex];
+          const myPct  = ctx.raw.toFixed(1);
+          const avgPct = teamAvg[ctx.datasetIndex].toFixed(1);
+          const diff   = (ctx.raw - teamAvg[ctx.datasetIndex]).toFixed(1);
+          const arrow  = ctx.raw > teamAvg[ctx.datasetIndex] ? '▲' : (ctx.raw < teamAvg[ctx.datasetIndex] ? '▼' : '=');
+          return ` ${ctx.dataset.label}: ${myPct}%  ${arrow} ${Math.abs(diff)}pp vs team avg ${avgPct}%  (${fmtNum(a[col])} incidents)`;
+        }}}
+      }
+    }
+  });
+}
+
+// Agent Mix: stacked 100% bar showing each agent's pb_* type breakdown
+function renderProblemMix(rows, wrap) {
+  const byAgent = aggByAgent(rows)
+    .map(a => ({ ...a, pbTotal: PB_COLS.reduce((s,c) => s+(a[c]||0), 0) }))
+    .filter(a => a.pbTotal > 0)
+    .sort((a,b) => b.pbTotal - a.pbTotal);
+  const top = byAgent.slice(0, 20);
+  const h   = Math.max(260, top.length * 36);
+  wrap.style.height = h + 'px';
+  document.getElementById('problem-note').textContent =
+    byAgent.length > 20 ? `Showing top 20 of ${byAgent.length} agents by problem count — use Table for full data` : '';
+
+  const datasets = PB_COLS.map((col, i) => ({
+    label: PB_LABELS[i],
+    data: top.map(a => a.pbTotal ? +(a[col]/a.pbTotal*100).toFixed(2) : 0),
+    backgroundColor: PB_COLORS[i],
+    stack: 's'
+  }));
+
+  // Team-average reference line per column (% of all problems)
+  const teamTotal = byAgent.reduce((s,a) => s+a.pbTotal, 0);
+
+  mkChart('chart-pb', {
+    type: 'bar',
+    data: { labels: top.map(a => trunc(a.agent, 24)), datasets },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, beginAtZero: true, max: 100,
+             ticks: { callback: v => v+'%' }, grid: { color:'rgba(128,128,128,.1)' } },
+        y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
+      },
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => {
+          const a = top[ctx.dataIndex];
+          const col = PB_COLS[ctx.datasetIndex];
+          const teamPct = teamTotal ? (byAgent.reduce((s,x)=>s+(x[col]||0),0)/teamTotal*100).toFixed(1) : '—';
+          return ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%  (team avg ${teamPct}%)  · ${fmtNum(a[col])} incidents`;
+        }}}
+      }
+    }
+  });
 }
 
 function renderProblemOverall(rows, wrap) {
@@ -1653,6 +1768,7 @@ function render() {
   else renderReasonChart(rows);
   if (CV.problem === 'table') { buildMT('problem', rows);  renderMTUI('problem'); }
   else renderProblemChart(rows);
+  renderProblemMixStandalone(rows);
   renderTrend();
   renderTable(rows);
 }
