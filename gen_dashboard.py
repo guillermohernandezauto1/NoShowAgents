@@ -348,10 +348,7 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
         <button class="ctrl-btn"        id="problem-v-table"    onclick="setCView('problem','table')">Table</button>
       </div>
     </div>
-    <div id="problem-kpi-wrap" class="kpi-inline-row">
-      <div class="kpi-sm"><div class="kpi-sm-label">Problem Rate</div><div class="kpi-sm-value" id="kpi-pb-rate">—</div></div>
-      <div class="kpi-sm"><div class="kpi-sm-label">Total Incidents</div><div class="kpi-sm-value" id="kpi-pb-count">—</div></div>
-    </div>
+    <div id="problem-kpi-wrap"></div>
     <div id="problem-chart-wrap" class="chart-inner" style="height:220px">
       <canvas id="chart-pb"></canvas>
     </div>
@@ -723,11 +720,12 @@ function toggleFilter(arr, val, rebuildUI, callback) {
 }
 
 function buildMonthSelects() {
-  const months = [[1,'Jan'],[2,'Feb'],[3,'Mar'],[4,'Apr'],[5,'May'],[6,'Jun'],
-                  [7,'Jul'],[8,'Aug'],[9,'Sep'],[10,'Oct'],[11,'Nov'],[12,'Dec']];
-  const years = [...new Set(MONTHLY.map(r => r.year))].sort();
-  const opts = [];
-  for (const y of years) for (const [m,ml] of months) opts.push([y,m,`${ml} ${y}`]);
+  const MN = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'};
+  // Only include year-month combinations that have actual data rows
+  const existing = new Set(MONTHLY.map(r => `${r.year}-${r.month}`));
+  const opts = [...existing]
+    .map(k => { const [y,m] = k.split('-').map(Number); return [y, m, `${MN[m]} ${y}`]; })
+    .sort((a,b) => a[0]*100+a[1] - (b[0]*100+b[1]));
   ['month-from','month-to'].forEach((id,idx) => {
     const sel = document.getElementById(id);
     sel.innerHTML = '';
@@ -742,10 +740,11 @@ function buildMonthSelects() {
 }
 
 function buildWeekSelects() {
-  const years = [...new Set(WEEKLY.map(r => r.year))].sort();
-  const weeks = [...new Set(WEEKLY.map(r => r.week))].sort((a,b)=>a-b);
-  const opts = [];
-  for (const y of years) for (const w of weeks) opts.push([y,w,`W${w} ${y}`]);
+  // Only include year-week combinations that have actual data rows
+  const existing = new Set(WEEKLY.map(r => `${r.year}-${r.week}`));
+  const opts = [...existing]
+    .map(k => { const [y,w] = k.split('-').map(Number); return [y, w, `W${w} ${y}`]; })
+    .sort((a,b) => a[0]*100+a[1] - (b[0]*100+b[1]));
   ['week-from','week-to'].forEach((id,idx) => {
     const sel = document.getElementById(id);
     sel.innerHTML = '';
