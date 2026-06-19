@@ -561,7 +561,7 @@ const TOP_N = 15; // agents shown in "Top Agents" view
 let S = {
   view: 'agent',          // 'agent' | 'trend' (top-level tab)
   tab: 'monthly',         // 'monthly' | 'weekly' (data granularity)
-  years: [], countries: [], agents: [],
+  years: [], countries: ['DE'], agents: [],   // DE selected by default; user can switch
   monthPeriodFrom: 0, monthPeriodTo: 999999,  // overridden by buildMonthSelects
   weekPeriodFrom:  0, weekPeriodTo:  999999,  // overridden by buildWeekSelects
   reasonView: 'pie',
