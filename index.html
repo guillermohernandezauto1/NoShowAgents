@@ -356,7 +356,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
   <!-- 4b: Problem at Branch — Agent Mix (separate full-width card) -->
   <div class="chart-card full">
     <div class="card-header">
-      <div class="card-title">Problem Type Mix per Agent</div>
+      <div class="card-title">%Problem at the branch split</div>
       <div style="font-size:11px;opacity:.45">Each bar = that agent's % breakdown across all 8 branch problem types · Hover for team avg comparison</div>
     </div>
     <div style="max-height:480px;overflow-y:auto;border-radius:6px">
@@ -1181,7 +1181,7 @@ function renderReasonOverall(rows, wrap) {
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins: {
-          legend: { position:'right', labels:{ font:{ size:11 }, boxWidth:12 } },
+          legend: { position:'right', labels:{ font:{ size:13 }, boxWidth:12 } },
           tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtNum(ctx.raw)} (${pctN(ctx.raw,grand).toFixed(1)}%)` } },
           datalabels: dlDoughnutTop(3, grand)
         }
@@ -1209,7 +1209,8 @@ function renderReasonOverall(rows, wrap) {
 
 function renderReasonStacked(items, labelKey, wrap) {
   // items: array of objects with REASON_COLS fields + labelKey field
-  const h = Math.max(260, items.length * 38);
+  // floor of 360 keeps the 14-item legend in a single column at the larger font
+  const h = Math.max(360, items.length * 38);
   wrap.style.height = h + 'px';
   const datasets = REASON_COLS.map((col, i) => ({
     label: REASON_LABELS[i],
@@ -1230,7 +1231,7 @@ function renderReasonStacked(items, labelKey, wrap) {
         y: { stacked:true, ticks:{ font:{ size:12 }, autoSkip:false } }
       },
       plugins: {
-        legend: { position:'right', labels:{ font:{ size:10 }, boxWidth:10 } },
+        legend: { position:'right', labels:{ font:{ size:13 }, boxWidth:12 } },
         tooltip: { callbacks: { label: ctx => {
           const d = items[ctx.dataIndex];
           const col = REASON_COLS[ctx.datasetIndex];
@@ -1311,7 +1312,7 @@ function renderProblemMixStandalone(rows) {
         y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
       },
       plugins: {
-        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } },
+        legend: { position: 'right', labels: { font: { size: 13 }, boxWidth: 12 } },
         tooltip: { callbacks: { label: ctx => {
           const a = byAgent[ctx.dataIndex];
           const col = PB_COLS[ctx.datasetIndex];
@@ -1360,7 +1361,7 @@ function renderProblemMix(rows, wrap) {
         y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
       },
       plugins: {
-        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } },
+        legend: { position: 'right', labels: { font: { size: 13 }, boxWidth: 12 } },
         tooltip: { callbacks: { label: ctx => {
           const a = top[ctx.dataIndex];
           const col = PB_COLS[ctx.datasetIndex];
