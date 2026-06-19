@@ -48,6 +48,7 @@ html = r"""<!DOCTYPE html>
 <title>No-Show Call Outcomes Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5}
@@ -474,8 +475,8 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
           <option value="total_submissions">Total Submissions</option>
         </select>
         <select class="ctrl-select" id="trend-group" onchange="onTrendGroupChange()">
-          <option value="country">By Country</option>
           <option value="agent">By Agent</option>
+          <option value="country">By Country</option>
         </select>
         <!-- Agent picker — shown only in By Agent mode -->
         <div id="trend-agent-filter" style="display:none;position:relative">
@@ -1570,7 +1571,14 @@ function renderTrend() {
       },
       plugins: {
         legend: { display: group==='country', position:'top', labels:{ font:{ size:11 }, boxWidth:12, usePointStyle:true } },
-        tooltip: { callbacks: { label: ctx => ctx.raw==null?null:` ${ctx.dataset.label}: ${isPercentage?ctx.raw.toFixed(1)+'%':fmtNum(ctx.raw)}` } }
+        tooltip: { callbacks: { label: ctx => ctx.raw==null?null:` ${ctx.dataset.label}: ${isPercentage?ctx.raw.toFixed(1)+'%':fmtNum(ctx.raw)}` } },
+        datalabels: {
+          display: 'auto',          // auto-hide labels that would overlap
+          align: 'top', offset: 3, clamp: true,
+          formatter: v => v==null ? null : (isPercentage ? v.toFixed(1)+'%' : fmtNum(v)),
+          font: { size: 9, weight: '600' },
+          color: ctx => ctx.dataset.borderColor
+        }
       }
     }
   });
@@ -1842,12 +1850,19 @@ function render() {
 // INIT
 // ============================================================
 (function init() {
+  // Data-label plugin auto-registers globally; keep it OFF everywhere by
+  // default — only the Trend chart re-enables it in its own options.
+  if (window.ChartDataLabels) {
+    Chart.register(ChartDataLabels);
+    Chart.defaults.set('plugins.datalabels', { display: false });
+  }
   buildYearPills();
   buildCountryPills();
   buildAgentList();
   buildMonthSelects();
   buildWeekSelects();
   render();
+  onTrendGroupChange();  // trend defaults to "By Agent" — reveal the agent picker
 })();
 </script>
 </body>
