@@ -701,9 +701,17 @@ function buildCountryPills() {
     btn.className = 'pill pill-lg' + (S.countries.includes(c) ? ' on' : '');
     btn.textContent = c;
     btn.style.color = CCOLOR[c];
-    btn.onclick = () => toggleFilter(S.countries, c, buildCountryPills, () => { buildAgentList(); render(); });
+    btn.onclick = () => selectCountry(c);
     el.appendChild(btn);
   }
+}
+
+// Country is single-select: pick one country, or click the active one again to clear (all countries).
+function selectCountry(c) {
+  S.countries = (S.countries.length === 1 && S.countries[0] === c) ? [] : [c];
+  buildCountryPills();
+  buildAgentList();
+  render();
 }
 
 function toggleFilter(arr, val, rebuildUI, callback) {
