@@ -139,6 +139,20 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
 .cell-neutral{opacity:.6}
 .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
 .empty-state{padding:40px 20px;text-align:center;opacity:.35;font-size:13px}
+/* ── Top-level view tabs (bigger) ── */
+header .tabs .tab-btn{font-size:14px;padding:10px 24px}
+/* ── Granularity toggle inside filter bar ── */
+.granularity-tabs .tab-btn{padding:8px 18px;font-size:13px}
+/* ── Prominent filters (Country + time range) ── */
+#filter-bar{gap:20px;padding:16px 18px}
+.f-group.prominent .f-label{font-size:12px;opacity:.7;margin-bottom:3px}
+.pill-lg{padding:8px 16px;font-size:14px;border-radius:22px;border-width:2px}
+.range-row.lg{gap:8px}
+.range-row.lg select{padding:9px 14px;font-size:14px;font-weight:600;border-radius:8px;border-width:1.5px}
+.range-row.lg .range-sep{font-size:13px;opacity:.6}
+/* ── Trend tab ── */
+#view-trend .card-title{font-size:16px}
+#view-trend .ctrl-select{padding:6px 12px;font-size:13px}
 </style>
 </head>
 <body>
@@ -148,21 +162,27 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
 <header>
   <div style="display:flex;align-items:center;gap:12px">
     <h1>No-Show Call Outcomes</h1>
-    <span id="data-badge" style="font-size:11px;opacity:.4;padding:2px 8px;border-radius:10px;border:1px solid rgba(128,128,128,.3)">Monthly</span>
   </div>
   <div class="tabs">
-    <button class="tab-btn active" id="btn-monthly" onclick="setTab('monthly')">Monthly</button>
-    <button class="tab-btn"        id="btn-weekly"  onclick="setTab('weekly')">Weekly</button>
+    <button class="tab-btn active" id="btn-view-agent" onclick="setView('agent')">Agent view</button>
+    <button class="tab-btn"        id="btn-view-trend" onclick="setView('trend')">Trend over time</button>
   </div>
 </header>
 
 <!-- FILTER BAR -->
 <div id="filter-bar">
   <div class="f-group">
+    <div class="f-label">Data</div>
+    <div class="tabs granularity-tabs">
+      <button class="tab-btn active" id="btn-monthly" onclick="setTab('monthly')">Monthly</button>
+      <button class="tab-btn"        id="btn-weekly"  onclick="setTab('weekly')">Weekly</button>
+    </div>
+  </div>
+  <div class="f-group">
     <div class="f-label">Year</div>
     <div class="pill-row" id="year-pills"></div>
   </div>
-  <div class="f-group">
+  <div class="f-group prominent">
     <div class="f-label">Country</div>
     <div class="pill-row" id="country-pills"></div>
   </div>
@@ -180,17 +200,17 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     </div>
     <div id="selected-agents"></div>
   </div>
-  <div class="f-group" id="month-range-group">
+  <div class="f-group prominent" id="month-range-group">
     <div class="f-label">Month Range</div>
-    <div class="range-row">
+    <div class="range-row lg">
       <select id="month-from" onchange="onMonthRange()"></select>
       <span class="range-sep">to</span>
       <select id="month-to"   onchange="onMonthRange()"></select>
     </div>
   </div>
-  <div class="f-group" id="week-range-group" style="display:none">
+  <div class="f-group prominent" id="week-range-group" style="display:none">
     <div class="f-label">Week Range</div>
-    <div class="range-row">
+    <div class="range-row lg">
       <select id="week-from" onchange="onWeekRange()"></select>
       <span class="range-sep">to</span>
       <select id="week-to"   onchange="onWeekRange()"></select>
@@ -198,15 +218,8 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
   </div>
 </div>
 
-<!-- KPI ROW -->
-<div id="kpi-row">
-  <div class="kpi-card"><div class="kpi-label">Total Submissions</div><div class="kpi-value" id="kpi-total">—</div></div>
-  <div class="kpi-card"><div class="kpi-label">Customers Reached</div><div class="kpi-value" id="kpi-reached">—</div></div>
-  <div class="kpi-card"><div class="kpi-label">Not Reached</div><div class="kpi-value" id="kpi-not-reached">—</div></div>
-  <div class="kpi-card"><div class="kpi-label">% Reached</div><div class="kpi-value" id="kpi-pct-reached">—</div></div>
-  <div class="kpi-card"><div class="kpi-label">% At Branch</div><div class="kpi-value" id="kpi-pct-branch">—</div></div>
-  <div class="kpi-card"><div class="kpi-label">% Rescheduled</div><div class="kpi-value" id="kpi-pct-reschedule">—</div></div>
-</div>
+<!-- ============ AGENT VIEW ============ -->
+<div id="view-agent">
 
 <!-- CHARTS GRID -->
 <div id="charts-grid">
@@ -216,8 +229,8 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     <div class="card-header">
       <div class="card-title">Customers Reached</div>
       <div class="card-controls">
-        <button class="ctrl-btn active" id="reached-v-country" onclick="setCView('reached','country')">By Country</button>
-        <button class="ctrl-btn"        id="reached-v-agent"   onclick="setCView('reached','agent')">Top Agents</button>
+        <button class="ctrl-btn"        id="reached-v-country" onclick="setCView('reached','country')">By Country</button>
+        <button class="ctrl-btn active" id="reached-v-agent"   onclick="setCView('reached','agent')">Top Agents</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="reached-v-table"   onclick="setCView('reached','table')">Table</button>
       </div>
@@ -252,14 +265,14 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     <div class="card-header">
       <div class="card-title">No-Show Reason Split</div>
       <div class="card-controls">
-        <button class="ctrl-btn active" id="reason-v-overall" onclick="setCView('reason','overall')">Overall</button>
+        <button class="ctrl-btn"        id="reason-v-overall" onclick="setCView('reason','overall')">Overall</button>
         <button class="ctrl-btn"        id="reason-v-country" onclick="setCView('reason','country')">By Country</button>
-        <button class="ctrl-btn"        id="reason-v-agent"   onclick="setCView('reason','agent')">Top Agents</button>
+        <button class="ctrl-btn active" id="reason-v-agent"   onclick="setCView('reason','agent')">Top Agents</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="reason-v-table"   onclick="setCView('reason','table')">Table</button>
       </div>
     </div>
-    <div id="reason-subtoggle" style="display:flex;gap:5px;margin-bottom:8px">
+    <div id="reason-subtoggle" style="display:none;gap:5px;margin-bottom:8px">
       <button class="ctrl-btn active" id="reason-btn-pie" onclick="setReasonSubView('pie')">Pie</button>
       <button class="ctrl-btn"        id="reason-btn-bar" onclick="setReasonSubView('bar')">Bar</button>
     </div>
@@ -304,8 +317,8 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     <div class="card-header">
       <div class="card-title">% Customer Was at the Branch</div>
       <div class="card-controls">
-        <button class="ctrl-btn active" id="branch-v-country" onclick="setCView('branch','country')">By Country</button>
-        <button class="ctrl-btn"        id="branch-v-agent"   onclick="setCView('branch','agent')">Top Agents</button>
+        <button class="ctrl-btn"        id="branch-v-country" onclick="setCView('branch','country')">By Country</button>
+        <button class="ctrl-btn active" id="branch-v-agent"   onclick="setCView('branch','agent')">Top Agents</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="branch-v-table"   onclick="setCView('branch','table')">Table</button>
       </div>
@@ -340,9 +353,9 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     <div class="card-header">
       <div class="card-title">Problem at Branch</div>
       <div class="card-controls">
-        <button class="ctrl-btn active" id="problem-v-overall"  onclick="setCView('problem','overall')">Overall</button>
+        <button class="ctrl-btn"        id="problem-v-overall"  onclick="setCView('problem','overall')">Overall</button>
         <button class="ctrl-btn"        id="problem-v-country"  onclick="setCView('problem','country')">By Country</button>
-        <button class="ctrl-btn"        id="problem-v-agent"    onclick="setCView('problem','agent')">Top Agents</button>
+        <button class="ctrl-btn active" id="problem-v-agent"    onclick="setCView('problem','agent')">Top Agents</button>
         <button class="ctrl-btn"        id="problem-v-mix"      onclick="setCView('problem','mix')">Agent Mix</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="problem-v-table"    onclick="setCView('problem','table')">Table</button>
@@ -400,8 +413,8 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     <div class="card-header">
       <div class="card-title">Appointment Rescheduled %</div>
       <div class="card-controls">
-        <button class="ctrl-btn active" id="resched-v-country" onclick="setCView('resched','country')">By Country</button>
-        <button class="ctrl-btn"        id="resched-v-agent"   onclick="setCView('resched','agent')">Top Agents</button>
+        <button class="ctrl-btn"        id="resched-v-country" onclick="setCView('resched','country')">By Country</button>
+        <button class="ctrl-btn active" id="resched-v-agent"   onclick="setCView('resched','agent')">Top Agents</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="resched-v-table"   onclick="setCView('resched','table')">Table</button>
       </div>
@@ -430,8 +443,26 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
     </div>
   </div>
 
-  <!-- 6: Trend Over Time -->
-  <div class="chart-card">
+  <!-- 7: Agent Performance Table -->
+  <div class="chart-card full">
+    <div class="card-header">
+      <div class="card-title">Agent Performance</div>
+      <span id="table-count" style="font-size:11px;opacity:.4"></span>
+    </div>
+    <div id="table-wrap" style="max-height:520px;overflow-y:auto">
+      <table class="agt" id="agent-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /charts-grid -->
+</div><!-- /view-agent -->
+
+<!-- ============ TREND VIEW ============ -->
+<div id="view-trend" style="display:none">
+  <div class="chart-card full">
     <div class="card-header">
       <div class="card-title">Trend Over Time</div>
       <div class="card-controls">
@@ -464,26 +495,11 @@ table.agt tr:hover td{background:rgba(128,128,128,.04)}
         </div>
       </div>
     </div>
-    <div class="chart-inner" style="height:280px">
+    <div class="chart-inner" style="height:600px">
       <canvas id="chart-trend"></canvas>
     </div>
   </div>
-
-  <!-- 7: Agent Performance Table -->
-  <div class="chart-card full">
-    <div class="card-header">
-      <div class="card-title">Agent Performance</div>
-      <span id="table-count" style="font-size:11px;opacity:.4"></span>
-    </div>
-    <div id="table-wrap" style="max-height:520px;overflow-y:auto">
-      <table class="agt" id="agent-table">
-        <thead id="table-head"></thead>
-        <tbody id="table-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-</div><!-- /charts-grid -->
+</div><!-- /view-trend -->
 </div><!-- /app -->
 
 <script>
@@ -542,7 +558,8 @@ const TOP_N = 15; // agents shown in "Top Agents" view
 // STATE
 // ============================================================
 let S = {
-  tab: 'monthly',
+  view: 'agent',          // 'agent' | 'trend' (top-level tab)
+  tab: 'monthly',         // 'monthly' | 'weekly' (data granularity)
   years: [], countries: [], agents: [],
   monthPeriodFrom: 0, monthPeriodTo: 999999,  // overridden by buildMonthSelects
   weekPeriodFrom:  0, weekPeriodTo:  999999,  // overridden by buildWeekSelects
@@ -551,8 +568,8 @@ let S = {
 };
 let CH = {};
 
-// Chart view modes
-let CV = { reached: 'country', branch: 'country', resched: 'country', reason: 'overall', problem: 'overall' };
+// Chart view modes — default every chart to Top Agents
+let CV = { reached: 'agent', branch: 'agent', resched: 'agent', reason: 'agent', problem: 'agent' };
 
 // Mini-table state per chart
 let MT = {
@@ -670,13 +687,30 @@ function setCView(chart, mode) {
 }
 
 // ============================================================
-// TAB
+// TOP-LEVEL VIEW  (Agent view / Trend over time)
+// ============================================================
+function setView(view) {
+  S.view = view;
+  document.getElementById('btn-view-agent').classList.toggle('active', view === 'agent');
+  document.getElementById('btn-view-trend').classList.toggle('active', view === 'trend');
+  document.getElementById('view-agent').style.display = view === 'agent' ? '' : 'none';
+  document.getElementById('view-trend').style.display = view === 'trend' ? '' : 'none';
+  // Re-render the now-visible view so charts size correctly after being unhidden.
+  if (view === 'trend') {
+    renderTrend();
+    if (CH['chart-trend']) CH['chart-trend'].resize();
+  } else {
+    render();
+  }
+}
+
+// ============================================================
+// TAB  (Monthly / Weekly data granularity)
 // ============================================================
 function setTab(tab) {
   S.tab = tab;
   document.getElementById('btn-monthly').classList.toggle('active', tab === 'monthly');
   document.getElementById('btn-weekly').classList.toggle('active',  tab === 'weekly');
-  document.getElementById('data-badge').textContent = tab === 'monthly' ? 'Monthly' : 'Weekly';
   document.getElementById('month-range-group').style.display = tab === 'monthly' ? '' : 'none';
   document.getElementById('week-range-group').style.display  = tab === 'weekly'  ? '' : 'none';
   buildYearPills();
@@ -706,7 +740,7 @@ function buildCountryPills() {
   el.innerHTML = '';
   for (const c of COUNTRIES) {
     const btn = document.createElement('button');
-    btn.className = 'pill' + (S.countries.includes(c) ? ' on' : '');
+    btn.className = 'pill pill-lg' + (S.countries.includes(c) ? ' on' : '');
     btn.textContent = c;
     btn.style.color = CCOLOR[c];
     btn.onclick = () => toggleFilter(S.countries, c, buildCountryPills, () => { buildAgentList(); render(); });
@@ -836,24 +870,6 @@ document.getElementById('agent-search').addEventListener('input', function() {
     d.style.display = d.dataset.name.toLowerCase().includes(q) ? '' : 'none';
   });
 });
-
-// ============================================================
-// KPI
-// ============================================================
-function renderKPIs(rows) {
-  const tot  = sumField(rows,'total_submissions');
-  const ry   = sumField(rows,'reached_yes');
-  const rn   = sumField(rows,'reached_no');
-  const aby  = sumField(rows,'at_branch_yes');
-  const abn  = sumField(rows,'at_branch_no');
-  const newA = sumField(rows,'result_new_appt');
-  document.getElementById('kpi-total').textContent       = fmtNum(tot);
-  document.getElementById('kpi-reached').textContent     = fmtNum(ry);
-  document.getElementById('kpi-not-reached').textContent = fmtNum(rn);
-  document.getElementById('kpi-pct-reached').textContent = fmtPct(ry, tot);
-  document.getElementById('kpi-pct-branch').textContent  = fmtPct(aby, ry);
-  document.getElementById('kpi-pct-reschedule').textContent = fmtPct(newA, ry);
-}
 
 // ============================================================
 // CHART 1: CUSTOMERS REACHED  (country / top-agents)
@@ -1799,7 +1815,6 @@ function sortTable(col) {
 // ============================================================
 function render() {
   const rows = filtered();
-  renderKPIs(rows);
   if (CV.reached === 'table') { buildMT('reached', rows); renderMTUI('reached'); }
   else renderReachedChart(rows);
   if (CV.branch  === 'table') { buildMT('branch', rows);  renderMTUI('branch');  }
