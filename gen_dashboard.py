@@ -37,10 +37,10 @@ weekly  = load_csv(WEEKLY_PATH)
 for r in monthly: r['month'] = int(r['month'])
 for r in weekly:  r['week']  = int(r['week'])
 
-MJ = json.dumps(monthly, ensure_ascii=False, separators=(',',':'))
-WJ = json.dumps(weekly,  ensure_ascii=False, separators=(',',':'))
-
-html = r"""<!DOCTYPE html>
+# Single shared template. Data + per-build scope are injected via the
+# __MONTHLY_DATA__ / __WEEKLY_DATA__ / __SCOPE__ placeholders below, so every
+# output (HQ and each country) is produced from this exact same template.
+TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -162,7 +162,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
 <!-- HEADER -->
 <header>
   <div style="display:flex;align-items:center;gap:16px">
-    <h1>No-Show Call Outcomes</h1>
+    <h1 id="dash-title">No-Show Call Outcomes</h1>
     <div class="tabs">
       <button class="tab-btn active" id="btn-view-agent" onclick="setView('agent')">Agent view</button>
       <button class="tab-btn"        id="btn-view-trend" onclick="setView('trend')">Trend over time</button>
@@ -183,7 +183,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
     <div class="f-label">Year</div>
     <div class="pill-row" id="year-pills"></div>
   </div>
-  <div class="f-group prominent">
+  <div class="f-group prominent" id="country-filter-group">
     <div class="f-label">Country</div>
     <div class="pill-row" id="country-pills"></div>
   </div>
@@ -507,8 +507,9 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
 // ============================================================
 // DATA
 // ============================================================
-const MONTHLY = """ + MJ + r""";
-const WEEKLY  = """ + WJ + r""";
+const MONTHLY = __MONTHLY_DATA__;
+const WEEKLY  = __WEEKLY_DATA__;
+const SCOPE_COUNTRY = __SCOPE__;   // null on HQ, 'XX' on a per-country build
 
 // ============================================================
 // CONSTANTS
@@ -2027,6 +2028,14 @@ function render() {
     Chart.register(ChartDataLabels);
     Chart.defaults.set('plugins.datalabels', { display: false });
   }
+  // Per-country build: lock to this country, hide the country selector, label the title.
+  if (typeof SCOPE_COUNTRY === 'string' && SCOPE_COUNTRY) {
+    S.countries = [SCOPE_COUNTRY];
+    const cg = document.getElementById('country-filter-group');
+    if (cg) cg.style.display = 'none';
+    const t = document.getElementById('dash-title');
+    if (t) t.textContent = 'No-Show Call Outcomes — ' + SCOPE_COUNTRY;
+  }
   S.agents = currentScopeAgents();   // start with every agent selected (deselect to narrow)
   buildYearPills();
   buildCountryPills();
@@ -2040,9 +2049,55 @@ function render() {
 </body>
 </html>"""
 
-with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
-    f.write(html)
+# ---------------------------------------------------------------------------
+# Build every output from the SINGLE template above:
+#   • HQ (index.html)         — all countries (the main dashboard)
+#   • de/index.html, es/…     — one folder per country, each with ONLY its data
+# Because they share one template, HQ and every country page are byte-for-byte
+# identical except for the embedded data + the one SCOPE_COUNTRY line. The
+# assertion below makes the build FAIL if a country page ever drifts in format.
+# ---------------------------------------------------------------------------
+def _render(monthly_rows, weekly_rows, scope_country):
+    mj = json.dumps(monthly_rows, ensure_ascii=False, separators=(',', ':'))
+    wj = json.dumps(weekly_rows,  ensure_ascii=False, separators=(',', ':'))
+    scope = "'%s'" % scope_country if scope_country else 'null'
+    return (TEMPLATE
+            .replace('__MONTHLY_DATA__', mj)
+            .replace('__WEEKLY_DATA__', wj)
+            .replace('__SCOPE__', scope))
 
-size_kb = len(html.encode()) // 1024
-print(f"Dashboard written: {OUTPUT_PATH}")
-print(f"File size: {size_kb} KB")
+def _template_only(html):
+    # Drop the data/scope lines so the rest (the shared format) can be compared.
+    return '\n'.join(
+        ln for ln in html.split('\n')
+        if not ln.lstrip().startswith(('const MONTHLY =', 'const WEEKLY', 'const SCOPE_COUNTRY'))
+    )
+
+def _write(html, path):
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+# HQ — all countries
+hq = _render(monthly, weekly, None)
+_write(hq, OUTPUT_PATH)
+print(f"HQ written: {OUTPUT_PATH}  ({len(hq.encode()) // 1024} KB)")
+hq_template = _template_only(hq)
+
+# One build per country present in the data, into <code>.lower()/index.html
+out_dir = os.path.dirname(os.path.abspath(OUTPUT_PATH))
+countries = sorted({r['country'] for r in monthly} | {r['country'] for r in weekly})
+for c in countries:
+    m = [r for r in monthly if r['country'] == c]
+    w = [r for r in weekly  if r['country'] == c]
+    html = _render(m, w, c)
+    assert _template_only(html) == hq_template, \
+        f"Template drift for {c}: country page format differs from HQ!"
+    path = os.path.join(out_dir, c.lower(), 'index.html')
+    _write(html, path)
+    print(f"  {c}: {os.path.relpath(path, out_dir)}  "
+          f"({len(html.encode()) // 1024} KB, {len(m)} monthly / {len(w)} weekly rows)")
+
+print(f"Built HQ + {len(countries)} country pages — all share the HQ template ✓")

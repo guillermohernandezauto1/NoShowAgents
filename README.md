@@ -17,11 +17,30 @@ Interactive dashboard tracking no-show call outcomes per agent per country.
 | Trend Over Time | Any metric over months or weeks, by country or agent |
 | Agent Performance Table | Full per-agent sortable breakdown |
 
+## HQ + per-country builds
+
+One generator, one template, many pages. A single run produces:
+
+| Page | URL | Data |
+|---|---|---|
+| **HQ** (main) | `…/NoShowAgents/` | All countries |
+| Per country | `…/NoShowAgents/de/`, `/es/`, `/fr/`, … | That country **only** |
+
+Each country page contains *only* its own rows (real data isolation) and hides the
+country selector. Because every page is generated from the **same template**, they
+can never drift in format — the build even asserts the country pages are byte-for-byte
+identical to HQ apart from the embedded data. To change anything, edit
+`gen_dashboard.py` once and rerun; HQ and all country pages update together.
+
+To restrict each country to its own page, put the per-country URLs behind an auth
+layer (e.g. Cloudflare Access with Google Workspace) mapping each country group to
+its path.
+
 ## Refreshing the data
 
 See `CLAUDE.md` for the full automation prompt.
 
-Quick version:
+Quick version (builds HQ **and** every per-country page):
 ```bash
 python3 gen_dashboard.py data/Monthly_Feed.csv data/Weekly_Feed.csv index.html
 ```
