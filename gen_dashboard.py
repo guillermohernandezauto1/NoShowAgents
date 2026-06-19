@@ -733,6 +733,38 @@ function dlDoughnutTop(topN, grand) {
 }
 
 // ============================================================
+// LEGEND CLICK = HIGHLIGHT ONE CATEGORY (grey out the rest)
+//   Click a legend entry to keep its colour and mute the others;
+//   click it again to restore all colours.
+// ============================================================
+function barLegendHighlight(e, legendItem, legend) {
+  const ci = legend.chart, idx = legendItem.datasetIndex;
+  if (!ci.$origBG) ci.$origBG = ci.data.datasets.map(d => d.backgroundColor);
+  ci.$hl = (ci.$hl === idx) ? null : idx;
+  ci.data.datasets.forEach((d, i) =>
+    d.backgroundColor = (ci.$hl == null || i === ci.$hl) ? ci.$origBG[i] : 'rgba(150,150,150,.2)');
+  ci.update();
+}
+function pieLegendHighlight(e, legendItem, legend) {
+  const ci = legend.chart, idx = legendItem.index, ds = ci.data.datasets[0];
+  if (!ci.$origBG) ci.$origBG = ds.backgroundColor.slice();
+  ci.$hl = (ci.$hl === idx) ? null : idx;
+  ds.backgroundColor = ci.$origBG.map((c, i) => (ci.$hl == null || i === ci.$hl) ? c : 'rgba(150,150,150,.2)');
+  ci.update();
+}
+function lineLegendHighlight(e, legendItem, legend) {
+  const ci = legend.chart, idx = legendItem.datasetIndex;
+  if (!ci.$origBorder) ci.$origBorder = ci.data.datasets.map(d => d.borderColor);
+  ci.$hl = (ci.$hl === idx) ? null : idx;
+  ci.data.datasets.forEach((d, i) => {
+    const on = ci.$hl == null || i === ci.$hl;
+    d.borderColor = on ? ci.$origBorder[i] : 'rgba(150,150,150,.25)';
+    d.borderWidth = (ci.$hl != null && i === ci.$hl) ? 3 : 2;
+  });
+  ci.update();
+}
+
+// ============================================================
 // CHART VIEW TOGGLE (for the 3 agent bar charts)
 // ============================================================
 const C_MAP = {
@@ -803,6 +835,7 @@ function setTab(tab) {
   document.getElementById('month-range-group').style.display = tab === 'monthly' ? '' : 'none';
   document.getElementById('week-range-group').style.display  = tab === 'weekly'  ? '' : 'none';
   buildYearPills();
+  S.agents = currentScopeAgents();   // re-seed agent selection for this tab's >100 scope
   buildAgentList();
   render();
 }
@@ -907,11 +940,15 @@ function onWeekRange() {
   render();
 }
 
-// All agents available under the current country filter.
+// All agents available under the current country filter, restricted to those
+// with more than 100 total submissions (low-volume agents are hidden everywhere).
 function currentScopeAgents() {
-  return [...new Set(srcData()
-    .filter(r => !S.countries.length || S.countries.includes(r.country))
-    .map(r => r.agent_name))].sort();
+  const subs = {};
+  for (const r of srcData()) {
+    if (S.countries.length && !S.countries.includes(r.country)) continue;
+    subs[r.agent_name] = (subs[r.agent_name] || 0) + (r.total_submissions || 0);
+  }
+  return Object.keys(subs).filter(a => subs[a] > 100).sort();
 }
 
 function buildAgentList() {
@@ -1197,7 +1234,7 @@ function agentBarOpts({ tooltip }) {
       y: { stacked:true, ticks:{ font:{ size:12 }, autoSkip:false } }
     },
     plugins: {
-      legend: { position:'top', labels:{ font:{ size:11 }, boxWidth:12 } },
+      legend: { position:'top', onClick: barLegendHighlight, labels:{ font:{ size:11 }, boxWidth:12 } },
       tooltip: { callbacks: { label: ctx => ` ${tooltip(ctx)}` } },
       datalabels: dlReachedPct()
     }
@@ -1235,7 +1272,7 @@ function renderReasonOverall(rows, wrap) {
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins: {
-          legend: { position:'right', labels:{ font:{ size:13 }, boxWidth:12 } },
+          legend: { position:'right', onClick: pieLegendHighlight, labels:{ font:{ size:13 }, boxWidth:12 } },
           tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtNum(ctx.raw)} (${pctN(ctx.raw,grand).toFixed(1)}%)` } },
           datalabels: dlDoughnutTop(3, grand)
         }
@@ -1285,7 +1322,7 @@ function renderReasonStacked(items, labelKey, wrap) {
         y: { stacked:true, ticks:{ font:{ size:12 }, autoSkip:false } }
       },
       plugins: {
-        legend: { position:'right', labels:{ font:{ size:13 }, boxWidth:12 } },
+        legend: { position:'right', onClick: barLegendHighlight, labels:{ font:{ size:13 }, boxWidth:12 } },
         tooltip: { callbacks: { label: ctx => {
           const d = items[ctx.dataIndex];
           const col = REASON_COLS[ctx.datasetIndex];
@@ -1366,7 +1403,7 @@ function renderProblemMixStandalone(rows) {
         y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
       },
       plugins: {
-        legend: { position: 'right', labels: { font: { size: 13 }, boxWidth: 12 } },
+        legend: { position: 'right', onClick: barLegendHighlight, labels: { font: { size: 13 }, boxWidth: 12 } },
         tooltip: { callbacks: { label: ctx => {
           const a = byAgent[ctx.dataIndex];
           const col = PB_COLS[ctx.datasetIndex];
@@ -1415,7 +1452,7 @@ function renderProblemMix(rows, wrap) {
         y: { stacked: true, ticks: { font: { size: 11 }, autoSkip: false } }
       },
       plugins: {
-        legend: { position: 'right', labels: { font: { size: 13 }, boxWidth: 12 } },
+        legend: { position: 'right', onClick: barLegendHighlight, labels: { font: { size: 13 }, boxWidth: 12 } },
         tooltip: { callbacks: { label: ctx => {
           const a = top[ctx.dataIndex];
           const col = PB_COLS[ctx.datasetIndex];
@@ -1686,7 +1723,7 @@ function renderTrend() {
         y: { beginAtZero:false, grace:'8%', ticks:{ callback:v=>isPercentage?v.toFixed(1)+'%':fmtNum(v), font:{ size:11 } }, grid:{ color:'rgba(128,128,128,.1)' } }
       },
       plugins: {
-        legend: { display: group==='country', position:'top', labels:{ font:{ size:11 }, boxWidth:12, usePointStyle:true } },
+        legend: { display: group==='country', position:'top', onClick: lineLegendHighlight, labels:{ font:{ size:11 }, boxWidth:12, usePointStyle:true } },
         tooltip: { callbacks: { label: ctx => ctx.raw==null?null:` ${ctx.dataset.label}: ${isPercentage?ctx.raw.toFixed(1)+'%':fmtNum(ctx.raw)}` } },
         datalabels: {
           labels: {
