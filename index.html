@@ -549,7 +549,9 @@ function filtered() {
   return srcData().filter(r => {
     if (S.years.length    && !S.years.includes(r.year))        return false;
     if (S.countries.length && !S.countries.includes(r.country)) return false;
-    if (S.agents.length   && !S.agents.includes(r.agent_name)) return false;
+    // S.agents holds the explicitly-selected agents (all selected by default).
+    // Deselecting removes them; an empty selection means no agents.
+    if (!S.agents.includes(r.agent_name)) return false;
     if (S.tab === 'monthly') {
       if ((r.year*100+r.month) < S.monthPeriodFrom || (r.year*100+r.month) > S.monthPeriodTo) return false;
     } else {
@@ -797,6 +799,7 @@ function buildCountryPills() {
 function selectCountry(c) {
   S.countries = (S.countries.length === 1 && S.countries[0] === c) ? [] : [c];
   buildCountryPills();
+  S.agents = currentScopeAgents();   // re-select all agents of the new country
   buildAgentList();
   render();
 }
@@ -862,10 +865,15 @@ function onWeekRange() {
   render();
 }
 
-function buildAgentList() {
-  const agents = [...new Set(srcData()
+// All agents available under the current country filter.
+function currentScopeAgents() {
+  return [...new Set(srcData()
     .filter(r => !S.countries.length || S.countries.includes(r.country))
     .map(r => r.agent_name))].sort();
+}
+
+function buildAgentList() {
+  const agents = currentScopeAgents();
   const el = document.getElementById('agent-list');
   el.innerHTML = '';
   for (const a of agents) {
@@ -887,7 +895,12 @@ function buildAgentList() {
 
 function renderSelectedAgents() {
   const el = document.getElementById('selected-agents');
-  if (!S.agents.length) { el.innerHTML = '<span style="font-size:11px;opacity:.4">All agents</span>'; return; }
+  const total = currentScopeAgents().length;
+  const n = S.agents.length;
+  if (n === 0) { el.innerHTML = '<span style="font-size:11px;opacity:.4">No agents selected</span>'; return; }
+  if (n >= total) { el.innerHTML = '<span style="font-size:11px;opacity:.4">All agents</span>'; return; }
+  // For a small subset, show removable chips; otherwise just a count.
+  if (n > 8) { el.innerHTML = `<span style="font-size:11px;opacity:.55">${n} of ${total} agents selected</span>`; return; }
   el.innerHTML = S.agents.map(a =>
     `<span class="agent-tag">${a}<span class="rm" onclick="removeAgent('${a.replace(/'/g,"\\'")}')">✕</span></span>`
   ).join('');
@@ -902,13 +915,12 @@ function removeAgent(name) {
 }
 
 function selectAllAgents() {
-  S.agents = [...new Set(srcData().map(r => r.agent_name))].sort();
+  S.agents = currentScopeAgents();
   buildAgentList(); render();
 }
 function clearAgents() {
   S.agents = [];
-  document.querySelectorAll('.agent-option input').forEach(cb => cb.checked = false);
-  renderSelectedAgents(); render();
+  buildAgentList(); render();
 }
 
 document.getElementById('agent-search').addEventListener('focus', () =>
@@ -1936,6 +1948,7 @@ function render() {
     Chart.register(ChartDataLabels);
     Chart.defaults.set('plugins.datalabels', { display: false });
   }
+  S.agents = currentScopeAgents();   // start with every agent selected (deselect to narrow)
   buildYearPills();
   buildCountryPills();
   buildAgentList();
