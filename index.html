@@ -426,10 +426,10 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
       <div class="card-title">Trend Over Time</div>
       <div class="card-controls">
         <select class="ctrl-select" id="trend-metric" onchange="renderTrend()">
-          <option value="reached_yes">Reached</option>
-          <option value="result_new_appt">Rescheduled</option>
-          <option value="at_branch_yes">At Branch</option>
-          <option value="reason_problem_branch">Reason: Branch Problem</option>
+          <option value="reached_yes">Reach rate</option>
+          <option value="result_new_appt">%Reschedule/Reached</option>
+          <option value="at_branch_yes">% customer at branch</option>
+          <option value="reason_problem_branch">% Problem at branch</option>
           <option value="total_submissions">Total Submissions</option>
         </select>
         <select class="ctrl-select" id="trend-group" onchange="onTrendGroupChange()">
@@ -1622,6 +1622,8 @@ function renderTrend() {
     data: { labels: displayLabels, datasets },
     options: {
       responsive:true, maintainAspectRatio:false,
+      // reserve room on the right for the agent-name labels at each line's end
+      layout: { padding: { right: group==='agent' ? 140 : 8 } },
       interaction: { mode:'index', intersect:false },
       scales: {
         x: { grid:{ color:'rgba(128,128,128,.08)' }, ticks:{ font:{ size:10 } } },
@@ -1632,11 +1634,29 @@ function renderTrend() {
         legend: { display: group==='country', position:'top', labels:{ font:{ size:11 }, boxWidth:12, usePointStyle:true } },
         tooltip: { callbacks: { label: ctx => ctx.raw==null?null:` ${ctx.dataset.label}: ${isPercentage?ctx.raw.toFixed(1)+'%':fmtNum(ctx.raw)}` } },
         datalabels: {
-          display: 'auto',          // auto-hide labels that would overlap
-          align: 'top', offset: 3, clamp: true,
-          formatter: v => v==null ? null : (isPercentage ? v.toFixed(1)+'%' : fmtNum(v)),
-          font: { size: 9, weight: '600' },
-          color: ctx => ctx.dataset.borderColor
+          labels: {
+            // value on each point (auto-hides where labels would overlap)
+            value: {
+              display: 'auto',
+              align: 'top', offset: 3, clamp: true,
+              formatter: v => v==null ? null : (isPercentage ? v.toFixed(1)+'%' : fmtNum(v)),
+              font: { size: 9, weight: '600' },
+              color: ctx => ctx.dataset.borderColor
+            },
+            // agent name at the end of each line (By Agent mode) — big & bold
+            name: {
+              display: ctx => {
+                if (group !== 'agent') return false;
+                const d = ctx.dataset.data; let last = -1;
+                for (let i = 0; i < d.length; i++) if (d[i] != null) last = i;
+                return ctx.dataIndex === last;
+              },
+              anchor: 'end', align: 'right', offset: 8, clamp: true, clip: false,
+              formatter: (v, ctx) => trunc(ctx.dataset.label, 18),
+              font: { size: 13, weight: '700' },
+              color: ctx => ctx.dataset.borderColor
+            }
+          }
         }
       }
     }
