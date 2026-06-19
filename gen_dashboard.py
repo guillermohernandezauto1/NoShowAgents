@@ -646,6 +646,91 @@ function mkChart(id, cfg) {
 }
 
 // ============================================================
+// DATA-LABEL HELPERS  (Agent-view charts)
+//   • every graph gets % labels
+//   • when a bar breaks into >3 categories, only the top 3 (by %) are labelled
+// ============================================================
+// 100%-stacked category bars whose values are already percentages
+// (Reason Split, Problem Mix). Label only the top `topN` segments per bar.
+function dlStackTop(topN) {
+  return {
+    display(ctx) {
+      const i = ctx.dataIndex;
+      const top = ctx.chart.data.datasets
+        .map((ds, di) => ({ di, v: +ds.data[i] || 0 }))
+        .filter(o => o.v > 0).sort((a, b) => b.v - a.v)
+        .slice(0, topN).map(o => o.di);
+      return top.includes(ctx.datasetIndex);
+    },
+    formatter: v => v > 0 ? Math.round(v) + '%' : null,
+    color: '#fff', font: { size: 10, weight: '700' },
+    textStrokeColor: 'rgba(0,0,0,.55)', textStrokeWidth: 2
+  };
+}
+// Stacked COUNT bars (Customers Reached) — show % reached on the solid segment.
+function dlReachedPct() {
+  return {
+    display: ctx => ctx.datasetIndex === 0 && (+ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+    formatter: (v, ctx) => {
+      const i = ctx.dataIndex;
+      const tot = ctx.chart.data.datasets.reduce((s, ds) => s + (+ds.data[i] || 0), 0);
+      return tot ? Math.round(v / tot * 100) + '%' : null;
+    },
+    color: '#fff', font: { size: 10, weight: '700' },
+    textStrokeColor: 'rgba(0,0,0,.55)', textStrokeWidth: 2
+  };
+}
+// Single-value % bars (At Branch, Rescheduled, Problem rate, the overall reason/PB
+// bars). One value per bar → label at the bar end. `topN` (optional) limits to the
+// N longest bars, used where the bars themselves are the >3 categories.
+function dlSinglePct(topN) {
+  return {
+    display(ctx) {
+      const v = +ctx.dataset.data[ctx.dataIndex] || 0;
+      if (v <= 0) return false;
+      if (!topN) return true;
+      const top = ctx.dataset.data.map((x, i) => ({ i, v: +x || 0 }))
+        .sort((a, b) => b.v - a.v).slice(0, topN).map(o => o.i);
+      return top.includes(ctx.dataIndex);
+    },
+    // Long bars: label inside the end (white + dark outline). Short bars: label
+    // just outside to the right, coloured like the bar so it stays readable in
+    // light or dark mode and never overlaps the agent name on the left.
+    anchor: 'end',
+    align: ctx => isShortBar(ctx) ? 'end' : 'start',
+    offset: 4, clamp: true, clip: false,
+    formatter: v => v.toFixed(1) + '%',
+    color: ctx => {
+      if (!isShortBar(ctx)) return '#fff';
+      const bg = ctx.dataset.backgroundColor;
+      return Array.isArray(bg) ? bg[ctx.dataIndex] : bg;
+    },
+    font: { size: 10, weight: '700' },
+    textStrokeColor: 'rgba(0,0,0,.5)', textStrokeWidth: 2
+  };
+}
+// A bar is "short" when it fills less than ~18% of the x-axis — too narrow to hold
+// its label inside, so the label goes outside to the right instead.
+function isShortBar(ctx) {
+  const v = +ctx.dataset.data[ctx.dataIndex] || 0;
+  const xmax = (ctx.chart.scales.x && ctx.chart.scales.x.max) || 100;
+  return v / xmax < 0.18;
+}
+// Doughnut (Reason overall pie) — label the top `topN` slices.
+function dlDoughnutTop(topN, grand) {
+  return {
+    display(ctx) {
+      const top = ctx.dataset.data.map((v, i) => ({ i, v: +v || 0 }))
+        .sort((a, b) => b.v - a.v).slice(0, topN).map(o => o.i);
+      return top.includes(ctx.dataIndex);
+    },
+    formatter: v => grand ? Math.round(v / grand * 100) + '%' : null,
+    color: '#fff', font: { size: 11, weight: '700' },
+    textStrokeColor: 'rgba(0,0,0,.55)', textStrokeWidth: 2
+  };
+}
+
+// ============================================================
 // CHART VIEW TOGGLE (for the 3 agent bar charts)
 // ============================================================
 const C_MAP = {
@@ -1014,7 +1099,8 @@ function branchBarCfg(items, avg, tooltipFn) {
           borderWidth:1.5, borderDash:[4,3],
           label:{ content:`Avg ${avg.toFixed(1)}%`, display:true, position:'start', font:{ size:10 } }
         }}},
-        tooltip: { callbacks: { label: ctx => ` ${tooltipFn(items[ctx.dataIndex])}` } }
+        tooltip: { callbacks: { label: ctx => ` ${tooltipFn(items[ctx.dataIndex])}` } },
+        datalabels: dlSinglePct()
       }
     }
   };
@@ -1083,7 +1169,8 @@ function reschedBarCfg(items, avg, tooltipFn) {
           borderWidth:1.5, borderDash:[4,3],
           label:{ content:`Avg ${avg.toFixed(1)}%`, display:true, position:'start', font:{ size:10 } }
         }}},
-        tooltip: { callbacks: { label: ctx => ` ${tooltipFn(items[ctx.dataIndex])}` } }
+        tooltip: { callbacks: { label: ctx => ` ${tooltipFn(items[ctx.dataIndex])}` } },
+        datalabels: dlSinglePct()
       }
     }
   };
@@ -1099,7 +1186,8 @@ function agentBarOpts({ tooltip }) {
     },
     plugins: {
       legend: { position:'top', labels:{ font:{ size:11 }, boxWidth:12 } },
-      tooltip: { callbacks: { label: ctx => ` ${tooltip(ctx)}` } }
+      tooltip: { callbacks: { label: ctx => ` ${tooltip(ctx)}` } },
+      datalabels: dlReachedPct()
     }
   };
 }
@@ -1136,7 +1224,8 @@ function renderReasonOverall(rows, wrap) {
         responsive:true, maintainAspectRatio:false,
         plugins: {
           legend: { position:'right', labels:{ font:{ size:11 }, boxWidth:12 } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtNum(ctx.raw)} (${pctN(ctx.raw,grand).toFixed(1)}%)` } }
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtNum(ctx.raw)} (${pctN(ctx.raw,grand).toFixed(1)}%)` } },
+          datalabels: dlDoughnutTop(3, grand)
         }
       }
     });
@@ -1154,7 +1243,7 @@ function renderReasonOverall(rows, wrap) {
           x: { beginAtZero:true, title:{ display:true, text:'% of reasons', font:{size:11} }, grid:{ color:'rgba(128,128,128,.1)' } },
           y: { ticks:{ font:{ size:11 } } }
         },
-        plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>` ${ctx.raw.toFixed(1)}%` } } }
+        plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>` ${ctx.raw.toFixed(1)}%` } }, datalabels: dlSinglePct(3) }
       }
     });
   }
@@ -1188,7 +1277,8 @@ function renderReasonStacked(items, labelKey, wrap) {
           const d = items[ctx.dataIndex];
           const col = REASON_COLS[ctx.datasetIndex];
           return ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}% (${fmtNum(d[col]||0)})`;
-        }}}
+        }}},
+        datalabels: dlStackTop(3)
       }
     }
   });
@@ -1272,7 +1362,8 @@ function renderProblemMixStandalone(rows) {
           const diff   = (ctx.raw - teamAvg[ctx.datasetIndex]).toFixed(1);
           const arrow  = ctx.raw > teamAvg[ctx.datasetIndex] ? '▲' : (ctx.raw < teamAvg[ctx.datasetIndex] ? '▼' : '=');
           return ` ${ctx.dataset.label}: ${myPct}%  ${arrow} ${Math.abs(diff)}pp vs team avg ${avgPct}%  (${fmtNum(a[col])} incidents)`;
-        }}}
+        }}},
+        datalabels: dlStackTop(3)
       }
     }
   });
@@ -1317,7 +1408,8 @@ function renderProblemMix(rows, wrap) {
           const col = PB_COLS[ctx.datasetIndex];
           const teamPct = teamTotal ? (byAgent.reduce((s,x)=>s+(x[col]||0),0)/teamTotal*100).toFixed(1) : '—';
           return ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%  (team avg ${teamPct}%)  · ${fmtNum(a[col])} incidents`;
-        }}}
+        }}},
+        datalabels: dlStackTop(3)
       }
     }
   });
@@ -1346,7 +1438,7 @@ function renderProblemOverall(rows, wrap) {
         x: { beginAtZero:true, ticks:{ callback:v=>v+'%' }, grid:{ color:'rgba(128,128,128,.1)' } },
         y: { ticks:{ font:{ size:11 } } }
       },
-      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>` ${ctx.raw.toFixed(1)}%` } } }
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>` ${ctx.raw.toFixed(1)}%` } }, datalabels: dlSinglePct(3) }
     }
   });
 }
@@ -1393,7 +1485,8 @@ function renderProblemByGroup(rows, wrap, groupBy) {
         tooltip: { callbacks: { label: ctx => {
           const d = items[ctx.dataIndex];
           return ` ${d.pct.toFixed(1)}% (${fmtNum(d.pbTotal)} incidents / ${fmtNum(d.reached_yes)} reached)`;
-        }}}
+        }}},
+        datalabels: dlSinglePct()
       }
     }
   });
