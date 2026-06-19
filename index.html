@@ -512,6 +512,7 @@ const PB_COLORS = [
   '#EF4444','#F97316','#EAB308','#22C55E','#06B6D4','#8B5CF6','#EC4899','#94A3B8'
 ];
 const TOP_N = 15; // agents shown in "Top Agents" view
+const TREND_MIN_CALLS = 100; // trend: hide agents with fewer than this many calls (low-volume outliers)
 
 // ============================================================
 // STATE
@@ -1473,7 +1474,13 @@ function renderTrend() {
   if (group === 'country') {
     groupKeys = [...new Set(rows.map(r=>r.country))].sort();
   } else {
-    const allAgents = [...new Set(rows.map(r=>r.agent_name))].sort();
+    // Drop low-volume agents (< TREND_MIN_CALLS calls over the visible range) —
+    // their percentages swing wildly and show up as outlier spikes.
+    const callsByAgent = {};
+    for (const r of rows) callsByAgent[r.agent_name] = (callsByAgent[r.agent_name]||0) + (r.total_submissions||0);
+    const allAgents = [...new Set(rows.map(r=>r.agent_name))]
+      .filter(a => (callsByAgent[a]||0) >= TREND_MIN_CALLS)
+      .sort();
     const validSel = trendAgents.filter(a => allAgents.includes(a));
     groupKeys = validSel.length > 0 ? validSel : allAgents;
     // Keep picker label in sync
@@ -1525,7 +1532,8 @@ function renderTrend() {
       interaction: { mode:'index', intersect:false },
       scales: {
         x: { grid:{ color:'rgba(128,128,128,.08)' }, ticks:{ font:{ size:10 } } },
-        y: { beginAtZero:true, ticks:{ callback:v=>isPercentage?v.toFixed(1)+'%':fmtNum(v), font:{ size:11 } }, grid:{ color:'rgba(128,128,128,.1)' } }
+        // Auto-scale to the data range (not from zero) so differences between agents are visible
+        y: { beginAtZero:false, grace:'8%', ticks:{ callback:v=>isPercentage?v.toFixed(1)+'%':fmtNum(v), font:{ size:11 } }, grid:{ color:'rgba(128,128,128,.1)' } }
       },
       plugins: {
         legend: { display: group==='country', position:'top', labels:{ font:{ size:11 }, boxWidth:12, usePointStyle:true } },
