@@ -37,6 +37,48 @@ weekly  = load_csv(WEEKLY_PATH)
 for r in monthly: r['month'] = int(r['month'])
 for r in weekly:  r['week']  = int(r['week'])
 
+# ── Branch_Feed: reasons split by at_branch yes/no ──────────────────────────
+BRANCH_PATH = os.path.join(_DIR, 'data', 'Branch_Feed.csv')
+BRANCH_NUM_FIELDS = [
+    'total_submissions',
+    'reason_forgot','reason_tried_cancel','reason_did_not_cancel','reason_problem_branch',
+    'reason_problem_cs','reason_no_info','reason_late','reason_no_docs','reason_car_not_running',
+    'reason_car_deregistered','reason_not_found_branch','reason_duplication','reason_appt_took_place','reason_other',
+    'pb_sent_away_docs','pb_eval_rejected','pb_unfriendly','pb_employee_late','pb_price_no_eval',
+    'pb_eval_sell_commit','pb_disagree_process','pb_other'
+]
+def load_branch(path):
+    with open(path, newline='', encoding='utf-8-sig') as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        for field in BRANCH_NUM_FIELDS:
+            v = r.get(field, '')
+            try: r[field] = float(v) if v != '' else 0.0
+            except: r[field] = 0.0
+        r['year'] = int(r['year'])
+        r['month'] = int(r['month'])
+    return rows
+branch_data = load_branch(BRANCH_PATH) if os.path.exists(BRANCH_PATH) else []
+
+# ── Stock: one row per lead with pb_ flags ───────────────────────────────────
+STOCK_PATH = os.path.join(_DIR, 'data', 'Stock.csv')
+_PB_LABELS = {
+    'pb_sent_away_docs':'Sent Away (Docs)', 'pb_eval_rejected':'Eval Rejected',
+    'pb_unfriendly':'Unfriendly', 'pb_employee_late':'Employee Late',
+    'pb_price_no_eval':'Price/No Eval', 'pb_eval_sell_commit':'Sell Commitment',
+    'pb_disagree_process':'Disagree Process', 'pb_other':'Other'
+}
+def load_stock(path):
+    with open(path, newline='', encoding='utf-8-sig') as f:
+        rows = list(csv.DictReader(f))
+    out = []
+    for r in rows:
+        probs = [lbl for col, lbl in _PB_LABELS.items() if r.get(col,'0').split('.')[0] == '1']
+        out.append({'country': r['country'], 'date': r['date'],
+                    'lead_id': r['lead_id'], 'problem': probs[0] if probs else '—'})
+    return out
+stock_data = load_stock(STOCK_PATH) if os.path.exists(STOCK_PATH) else []
+
 # Single shared template. Data + per-build scope are injected via the
 # __MONTHLY_DATA__ / __WEEKLY_DATA__ / __SCOPE__ placeholders below, so every
 # output (HQ and each country) is produced from this exact same template.
@@ -164,8 +206,9 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
   <div style="display:flex;align-items:center;gap:16px">
     <h1 id="dash-title">No-Show Call Outcomes</h1>
     <div class="tabs">
-      <button class="tab-btn active" id="btn-view-agent" onclick="setView('agent')">Agent view</button>
-      <button class="tab-btn"        id="btn-view-trend" onclick="setView('trend')">Trend over time</button>
+      <button class="tab-btn active" id="btn-view-agent"  onclick="setView('agent')">Agent view</button>
+      <button class="tab-btn"        id="btn-view-trend"  onclick="setView('trend')">Trend over time</button>
+      <button class="tab-btn"        id="btn-view-action" onclick="setView('action')">Action List</button>
     </div>
   </div>
 </header>
@@ -269,6 +312,10 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
         <button class="ctrl-btn"        id="reason-v-overall" onclick="setCView('reason','overall')">Overall</button>
         <button class="ctrl-btn"        id="reason-v-country" onclick="setCView('reason','country')">By Country</button>
         <button class="ctrl-btn active" id="reason-v-agent"   onclick="setCView('reason','agent')">Top Agents</button>
+        <div class="ctrl-sep"></div>
+        <button class="ctrl-btn active" id="reason-branch-both" onclick="setReasonBranch('both')" title="Use Monthly data — all reached customers">All</button>
+        <button class="ctrl-btn"        id="reason-branch-yes"  onclick="setReasonBranch('yes')"  title="Use Branch_Feed — was at branch">At Branch ✓</button>
+        <button class="ctrl-btn"        id="reason-branch-no"   onclick="setReasonBranch('no')"   title="Use Branch_Feed — not at branch">Not at Branch ✗</button>
         <div class="ctrl-sep"></div>
         <button class="ctrl-btn"        id="reason-v-table"   onclick="setCView('reason','table')">Table</button>
       </div>
@@ -501,14 +548,40 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
     </div>
   </div>
 </div><!-- /view-trend -->
+
+<!-- ============ ACTION LIST VIEW ============ -->
+<div id="view-action" style="display:none">
+  <div class="chart-card full" style="margin-top:12px">
+    <div class="card-header">
+      <div class="card-title">Action List — Branch Problems per Lead</div>
+      <div class="card-controls">
+        <input class="mini-tbl-search" id="action-search" placeholder="Search lead ID or problem…" oninput="renderActionList()" style="width:200px">
+        <span class="mini-tbl-info" id="action-count" style="margin-left:8px"></span>
+      </div>
+    </div>
+    <div style="max-height:600px;overflow-y:auto;border-radius:6px;border:1px solid rgba(128,128,128,.12)">
+      <table class="mt" id="action-table">
+        <thead><tr>
+          <th onclick="sortAction('country')">Country <span class="si">↕</span></th>
+          <th onclick="sortAction('date')">Date <span class="si">↕</span></th>
+          <th onclick="sortAction('lead_id')">Lead ID <span class="si">↕</span></th>
+          <th onclick="sortAction('problem')">Problem Type <span class="si">↕</span></th>
+        </tr></thead>
+        <tbody id="action-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /view-action -->
 </div><!-- /app -->
 
 <script>
 // ============================================================
 // DATA
 // ============================================================
-const MONTHLY = __MONTHLY_DATA__;
-const WEEKLY  = __WEEKLY_DATA__;
+const MONTHLY      = __MONTHLY_DATA__;
+const WEEKLY       = __WEEKLY_DATA__;
+const BRANCH_DATA  = __BRANCH_DATA__;
+const STOCK        = __STOCK_DATA__;
 const SCOPE_COUNTRY = __SCOPE__;   // null on HQ, 'XX' on a per-country build
 
 // ============================================================
@@ -815,8 +888,11 @@ function setView(view) {
   S.view = view;
   document.getElementById('btn-view-agent').classList.toggle('active', view === 'agent');
   document.getElementById('btn-view-trend').classList.toggle('active', view === 'trend');
-  document.getElementById('view-agent').style.display = view === 'agent' ? '' : 'none';
-  document.getElementById('view-trend').style.display = view === 'trend' ? '' : 'none';
+  document.getElementById('btn-view-action').classList.toggle('active', view === 'action');
+  document.getElementById('view-agent').style.display  = view === 'agent'  ? '' : 'none';
+  document.getElementById('view-trend').style.display  = view === 'trend'  ? '' : 'none';
+  document.getElementById('view-action').style.display = view === 'action' ? '' : 'none';
+  if (view === 'action') renderActionList();
   // Re-render the now-visible view so charts size correctly after being unhidden.
   if (view === 'trend') {
     renderTrend();
@@ -1243,6 +1319,84 @@ function agentBarOpts({ tooltip }) {
 }
 
 // ============================================================
+// ============================================================
+// BRANCH FILTER for Reason Split
+// ============================================================
+let reasonBranchFilter = 'both';  // 'both' | 'yes' | 'no'
+
+function setReasonBranch(f) {
+  reasonBranchFilter = f;
+  ['both','yes','no'].forEach(v => {
+    const el = document.getElementById(`reason-branch-${v}`);
+    if (el) el.classList.toggle('active', v === f);
+  });
+  const rows = reasonBranchFilter === 'both' ? filtered() : filteredBranch(reasonBranchFilter);
+  renderReasonChart(rows);
+}
+
+function filteredBranch(atBranch) {
+  return BRANCH_DATA.filter(r => {
+    if (r.at_branch !== atBranch) return false;
+    if (S.years.length    && !S.years.includes(r.year))        return false;
+    if (S.countries.length && !S.countries.includes(r.country)) return false;
+    if (S.agents.length   && !S.agents.includes(r.agent_name)) return false;
+    const key = r.year*100 + r.month;
+    if (key < S.monthPeriodFrom || key > S.monthPeriodTo) return false;
+    return true;
+  });
+}
+
+// ============================================================
+// ACTION LIST
+// ============================================================
+let actionSort = { col: 'date', dir: -1 };
+
+function renderActionList() {
+  const q = (document.getElementById('action-search')?.value || '').toLowerCase();
+  const countries = S.countries;
+
+  let data = STOCK.filter(r => {
+    if (countries.length && !countries.includes(r.country)) return false;
+    if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  data.sort((a, b) => {
+    const av = a[actionSort.col] || '', bv = b[actionSort.col] || '';
+    return av < bv ? -actionSort.dir : av > bv ? actionSort.dir : 0;
+  });
+
+  const countEl = document.getElementById('action-count');
+  if (countEl) countEl.textContent = `${data.length} lead${data.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('action-body');
+  if (!tbody) return;
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:24px;opacity:.4;font-size:12px">No records match current filters</td></tr>`;
+  } else {
+    const badge = c => `<span class="badge" style="background:${h2r(CCOLOR[c]||'#888',.12)};color:${CCOLOR[c]||'#888'}">${c}</span>`;
+    tbody.innerHTML = data.map(d => `<tr>
+      <td>${badge(d.country)}</td>
+      <td style="font-size:12px">${d.date}</td>
+      <td><code style="font-size:12px;background:rgba(128,128,128,.08);padding:1px 5px;border-radius:3px">${d.lead_id}</code></td>
+      <td style="font-size:12px">${d.problem}</td>
+    </tr>`).join('');
+  }
+
+  document.querySelectorAll('#action-table th').forEach(th => {
+    const col = th.getAttribute('onclick')?.match(/'([^']+)'\)/)?.[1];
+    th.classList.toggle('srt', col === actionSort.col);
+    const si = th.querySelector('.si');
+    if (si) si.textContent = col === actionSort.col ? (actionSort.dir === -1 ? '↓' : '↑') : '↕';
+  });
+}
+
+function sortAction(col) {
+  if (actionSort.col === col) actionSort.dir = -actionSort.dir;
+  else { actionSort.col = col; actionSort.dir = -1; }
+  renderActionList();
+}
+
 // CHART 2: REASON SPLIT
 // ============================================================
 let reasonSubView = 'pie';
@@ -2010,7 +2164,10 @@ function render() {
   if (CV.resched === 'table') { buildMT('resched', rows);  renderMTUI('resched'); }
   else renderRescheduleChart(rows);
   if (CV.reason  === 'table') { buildMT('reason', rows);   renderMTUI('reason');  }
-  else renderReasonChart(rows);
+  else {
+    const reasonRows = reasonBranchFilter === 'both' ? rows : filteredBranch(reasonBranchFilter);
+    renderReasonChart(reasonRows);
+  }
   if (CV.problem === 'table') { buildMT('problem', rows);  renderMTUI('problem'); }
   else renderProblemChart(rows);
   renderProblemMixStandalone(rows);
@@ -2057,21 +2214,26 @@ function render() {
 # identical except for the embedded data + the one SCOPE_COUNTRY line. The
 # assertion below makes the build FAIL if a country page ever drifts in format.
 # ---------------------------------------------------------------------------
-def _render(monthly_rows, weekly_rows, scope_country):
-    mj = json.dumps(monthly_rows, ensure_ascii=False, separators=(',', ':'))
-    wj = json.dumps(weekly_rows,  ensure_ascii=False, separators=(',', ':'))
+def _render(monthly_rows, weekly_rows, scope_country, branch_rows=None, stock_rows=None):
+    mj = json.dumps(monthly_rows,       ensure_ascii=False, separators=(',', ':'))
+    wj = json.dumps(weekly_rows,        ensure_ascii=False, separators=(',', ':'))
+    bj = json.dumps(branch_rows or [],  ensure_ascii=False, separators=(',', ':'))
+    sj = json.dumps(stock_rows  or [],  ensure_ascii=False, separators=(',', ':'))
     scope = "'%s'" % scope_country if scope_country else 'null'
     return (TEMPLATE
             .replace('__MONTHLY_DATA__', mj)
-            .replace('__WEEKLY_DATA__', wj)
+            .replace('__WEEKLY_DATA__',  wj)
+            .replace('__BRANCH_DATA__',  bj)
+            .replace('__STOCK_DATA__',   sj)
             .replace('__SCOPE__', scope))
 
 def _template_only(html):
-    # Drop the data/scope lines so the rest (the shared format) can be compared.
-    return '\n'.join(
-        ln for ln in html.split('\n')
-        if not ln.lstrip().startswith(('const MONTHLY =', 'const WEEKLY', 'const SCOPE_COUNTRY'))
-    )
+    # Drop injected-data lines so the shared template structure can be compared.
+    _DATA_VARS = ('MONTHLY', 'WEEKLY', 'BRANCH_DATA', 'STOCK', 'SCOPE_COUNTRY')
+    def _is_data(ln):
+        s = ln.lstrip()
+        return s.startswith('const ') and any(s.startswith(f'const {v}') for v in _DATA_VARS)
+    return '\n'.join(ln for ln in html.split('\n') if not _is_data(ln))
 
 def _write(html, path):
     d = os.path.dirname(path)
@@ -2081,7 +2243,7 @@ def _write(html, path):
         f.write(html)
 
 # HQ — all countries
-hq = _render(monthly, weekly, None)
+hq = _render(monthly, weekly, None, branch_data, stock_data)
 _write(hq, OUTPUT_PATH)
 print(f"HQ written: {OUTPUT_PATH}  ({len(hq.encode()) // 1024} KB)")
 hq_template = _template_only(hq)
@@ -2092,7 +2254,9 @@ countries = sorted({r['country'] for r in monthly} | {r['country'] for r in week
 for c in countries:
     m = [r for r in monthly if r['country'] == c]
     w = [r for r in weekly  if r['country'] == c]
-    html = _render(m, w, c)
+    b = [r for r in branch_data if r['country'] == c]
+    s = [r for r in stock_data  if r['country'] == c]
+    html = _render(m, w, c, b, s)
     assert _template_only(html) == hq_template, \
         f"Template drift for {c}: country page format differs from HQ!"
     path = os.path.join(out_dir, c.lower(), 'index.html')
