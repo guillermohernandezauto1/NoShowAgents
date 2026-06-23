@@ -574,6 +574,10 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
     <div style="padding:8px 12px 10px;font-size:12px;opacity:.65;border-bottom:1px solid rgba(128,128,128,.1)">
       Leads who were physically present at the branch during a no-show appointment. Each row represents one lead ID flagged with a call reason by the assigned agent. Use this list to follow up directly with customers and identify recurring issues per country.
     </div>
+    <div style="padding:8px 12px;border-bottom:1px solid rgba(128,128,128,.1);display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      <span style="font-size:11px;opacity:.5;margin-right:2px">Customer feedback:</span>
+      <div id="action-feedback-pills" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+    </div>
     <div style="max-height:600px;overflow-y:auto;border-radius:6px;border:1px solid rgba(128,128,128,.12)">
       <table class="mt" id="action-table">
         <thead><tr>
@@ -908,7 +912,7 @@ function setView(view) {
   document.getElementById('view-agent').style.display  = view === 'agent'  ? '' : 'none';
   document.getElementById('view-trend').style.display  = view === 'trend'  ? '' : 'none';
   document.getElementById('view-action').style.display = view === 'action' ? '' : 'none';
-  if (view === 'action') renderActionList();
+  if (view === 'action') { buildFeedbackPills(); renderActionList(); }
   // Re-render the now-visible view so charts size correctly after being unhidden.
   if (view === 'trend') {
     renderTrend();
@@ -1366,6 +1370,25 @@ function filteredBranch(atBranch) {
 // ACTION LIST
 // ============================================================
 let actionSort = { col: 'date', dir: -1 };
+let actionFeedbackFilter = null; // null = All
+
+function buildFeedbackPills() {
+  const el = document.getElementById('action-feedback-pills');
+  if (!el) return;
+  const values = [...new Set(STOCK.map(r => r.problem))].filter(Boolean).sort();
+  const all = [null, ...values];
+  el.innerHTML = all.map(v => {
+    const label = v === null ? 'All' : v;
+    const active = actionFeedbackFilter === v;
+    return `<button class="ctrl-btn${active ? ' active' : ''}" onclick="setFeedbackFilter(${v === null ? 'null' : JSON.stringify(v)})">${label}</button>`;
+  }).join('');
+}
+
+function setFeedbackFilter(v) {
+  actionFeedbackFilter = v;
+  buildFeedbackPills();
+  renderActionList();
+}
 
 function renderActionList() {
   const q = (document.getElementById('action-search')?.value || '').toLowerCase();
@@ -1373,7 +1396,8 @@ function renderActionList() {
 
   let data = STOCK.filter(r => {
     if (countries.length && !countries.includes(r.country)) return false;
-    if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q)) return false;
+    if (actionFeedbackFilter !== null && r.problem !== actionFeedbackFilter) return false;
+    if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q) && !r.subreason.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -2214,7 +2238,7 @@ function render() {
   renderProblemMixStandalone(rows);
   renderTrend();
   renderTable(rows);
-  if (S.view === 'action') renderActionList();
+  if (S.view === 'action') { buildFeedbackPills(); renderActionList(); }
 }
 
 // ============================================================
