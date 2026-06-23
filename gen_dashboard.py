@@ -1380,7 +1380,8 @@ function buildFeedbackPills() {
   el.innerHTML = all.map(v => {
     const label = v === null ? 'All' : v;
     const active = actionFeedbackFilter === v;
-    return `<button class="ctrl-btn${active ? ' active' : ''}" onclick="setFeedbackFilter(${v === null ? 'null' : JSON.stringify(v)})">${label}</button>`;
+    const arg = v === null ? 'null' : `'${v.replace(/'/g, "\\'")}'`;
+    return `<button class="ctrl-btn${active ? ' active' : ''}" onclick="setFeedbackFilter(${arg})">${label}</button>`;
   }).join('');
 }
 
