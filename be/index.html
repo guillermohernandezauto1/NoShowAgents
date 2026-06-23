@@ -469,17 +469,21 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
 <div id="view-action" style="display:none">
   <div class="chart-card full" style="margin-top:12px">
     <div class="card-header">
-      <div class="card-title">Action list customer was in branch <span id="action-date-badge" style="font-size:11px;font-weight:400;opacity:.6;margin-left:6px"></span></div>
+      <div class="card-title">Action list customer was in branch <span id="action-date-badge" style="font-size:11px;font-weight:400;opacity:.6;margin-left:6px">· Last 60 days</span></div>
       <div class="card-controls">
         <input class="mini-tbl-search" id="action-search" placeholder="Search lead ID or problem…" oninput="renderActionList()" style="width:200px">
         <span class="mini-tbl-info" id="action-count" style="margin-left:8px"></span>
+        <button class="ctrl-btn" onclick="downloadActionCSV()" style="margin-left:8px">⬇ Download CSV</button>
       </div>
+    </div>
+    <div style="padding:8px 12px 10px;font-size:12px;opacity:.65;border-bottom:1px solid rgba(128,128,128,.1)">
+      Leads who were physically present at the branch during a no-show appointment. Each row represents one lead ID flagged with a branch problem by the assigned agent. Use this list to follow up directly with customers and identify recurring issues per country.
     </div>
     <div style="max-height:600px;overflow-y:auto;border-radius:6px;border:1px solid rgba(128,128,128,.12)">
       <table class="mt" id="action-table">
         <thead><tr>
           <th onclick="sortAction('country')">Country <span class="si">↕</span></th>
-          <th onclick="sortAction('date')">Date <span class="si">↕</span></th>
+          <th onclick="sortAction('date')">Call date <span class="si">↕</span></th>
           <th onclick="sortAction('lead_id')">Lead ID <span class="si">↕</span></th>
           <th onclick="sortAction('problem')">Customer feedback <span class="si">↕</span></th>
         </tr></thead>
@@ -1311,6 +1315,30 @@ function sortAction(col) {
   if (actionSort.col === col) actionSort.dir = -actionSort.dir;
   else { actionSort.col = col; actionSort.dir = -1; }
   renderActionList();
+}
+
+function downloadActionCSV() {
+  const countries = S.countries;
+  const q = (document.getElementById('action-search')?.value || '').toLowerCase();
+  let data = STOCK.filter(r => {
+    if (countries.length && !countries.includes(r.country)) return false;
+    if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  data.sort((a, b) => {
+    const av = a[actionSort.col] || '', bv = b[actionSort.col] || '';
+    return av < bv ? -actionSort.dir : av > bv ? actionSort.dir : 0;
+  });
+  const escape = v => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = ['Country,Call date,Lead ID,Customer feedback'];
+  data.forEach(r => lines.push([r.country, r.date, r.lead_id, r.problem].map(escape).join(',')));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const suffix = countries.length === 1 ? `_${countries[0]}` : '_all';
+  a.download = `action_list${suffix}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // CHART 2: REASON SPLIT
