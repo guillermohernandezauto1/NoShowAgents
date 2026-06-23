@@ -553,7 +553,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
 <div id="view-action" style="display:none">
   <div class="chart-card full" style="margin-top:12px">
     <div class="card-header">
-      <div class="card-title">Action List — Branch Problems per Lead <span id="action-date-badge" style="font-size:11px;font-weight:400;opacity:.6;margin-left:6px"></span></div>
+      <div class="card-title">Action list customer was in branch <span id="action-date-badge" style="font-size:11px;font-weight:400;opacity:.6;margin-left:6px"></span></div>
       <div class="card-controls">
         <input class="mini-tbl-search" id="action-search" placeholder="Search lead ID or problem…" oninput="renderActionList()" style="width:200px">
         <span class="mini-tbl-info" id="action-count" style="margin-left:8px"></span>
@@ -565,7 +565,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
           <th onclick="sortAction('country')">Country <span class="si">↕</span></th>
           <th onclick="sortAction('date')">Date <span class="si">↕</span></th>
           <th onclick="sortAction('lead_id')">Lead ID <span class="si">↕</span></th>
-          <th onclick="sortAction('problem')">Problem Type <span class="si">↕</span></th>
+          <th onclick="sortAction('problem')">Customer feedback <span class="si">↕</span></th>
         </tr></thead>
         <tbody id="action-body"></tbody>
       </table>
