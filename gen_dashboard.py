@@ -564,7 +564,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
       </div>
     </div>
     <div style="padding:8px 12px 10px;font-size:12px;opacity:.65;border-bottom:1px solid rgba(128,128,128,.1)">
-      Leads who were physically present at the branch during a no-show appointment. Each row represents one lead ID flagged with a branch problem by the assigned agent. Use this list to follow up directly with customers and identify recurring issues per country.
+      Leads who were physically present at the branch during a no-show appointment. Each row represents one lead ID flagged with a call reason by the assigned agent. Use this list to follow up directly with customers and identify recurring issues per country.
     </div>
     <div style="max-height:600px;overflow-y:auto;border-radius:6px;border:1px solid rgba(128,128,128,.12)">
       <table class="mt" id="action-table">
