@@ -62,20 +62,23 @@ branch_data = load_branch(BRANCH_PATH) if os.path.exists(BRANCH_PATH) else []
 
 # ── Stock: one row per lead with pb_ flags ───────────────────────────────────
 STOCK_PATH = os.path.join(_DIR, 'data', 'Stock.csv')
-_PB_LABELS = {
-    'pb_sent_away_docs':'Sent Away (Docs)', 'pb_eval_rejected':'Eval Rejected',
-    'pb_unfriendly':'Unfriendly', 'pb_employee_late':'Employee Late',
-    'pb_price_no_eval':'Price/No Eval', 'pb_eval_sell_commit':'Sell Commitment',
-    'pb_disagree_process':'Disagree Process', 'pb_other':'Other'
+_REASON_LABELS = {
+    'reason_forgot':'Forgot appointment', 'reason_tried_cancel':'Tried to cancel',
+    'reason_did_not_cancel':'Did not cancel', 'reason_problem_branch':'Problem at branch',
+    'reason_problem_cs':'Problem with CS', 'reason_no_info':'No information given',
+    'reason_late':'Was late', 'reason_no_docs':'Missing documents',
+    'reason_car_not_running':'Car not running', 'reason_car_deregistered':'Car deregistered',
+    'reason_not_found_branch':'Could not find branch', 'reason_duplication':'Duplication',
+    'reason_appt_took_place':'Appointment took place', 'reason_other':'Other'
 }
 def load_stock(path):
     with open(path, newline='', encoding='utf-8-sig') as f:
         rows = list(csv.DictReader(f))
     out = []
     for r in rows:
-        probs = [lbl for col, lbl in _PB_LABELS.items() if r.get(col,'0').split('.')[0] == '1']
+        reasons = [lbl for col, lbl in _REASON_LABELS.items() if r.get(col,'0').split('.')[0] == '1']
         out.append({'country': r['country'], 'date': r['date'],
-                    'lead_id': r['lead_id'], 'problem': probs[0] if probs else '—'})
+                    'lead_id': r['lead_id'], 'problem': reasons[0] if reasons else '—'})
     return out
 stock_data = load_stock(STOCK_PATH) if os.path.exists(STOCK_PATH) else []
 
