@@ -553,7 +553,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
 <div id="view-action" style="display:none">
   <div class="chart-card full" style="margin-top:12px">
     <div class="card-header">
-      <div class="card-title">Action List — Branch Problems per Lead</div>
+      <div class="card-title">Action List — Branch Problems per Lead <span id="action-date-badge" style="font-size:11px;font-weight:400;opacity:.6;margin-left:6px"></span></div>
       <div class="card-controls">
         <input class="mini-tbl-search" id="action-search" placeholder="Search lead ID or problem…" oninput="renderActionList()" style="width:200px">
         <span class="mini-tbl-info" id="action-count" style="margin-left:8px"></span>
@@ -1355,7 +1355,17 @@ function renderActionList() {
   const q = (document.getElementById('action-search')?.value || '').toLowerCase();
   const countries = S.countries;
 
+  // 60-day window: compare YYYY-MM-DD strings (lexicographic sort works for ISO dates)
+  const now = new Date();
+  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 60);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffLabel = cutoff.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  const nowLabel    = now.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  const badge = document.getElementById('action-date-badge');
+  if (badge) badge.textContent = `Last 60 days (${cutoffLabel} – ${nowLabel})`;
+
   let data = STOCK.filter(r => {
+    if (r.date < cutoffStr) return false;
     if (countries.length && !countries.includes(r.country)) return false;
     if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q)) return false;
     return true;
@@ -2173,6 +2183,7 @@ function render() {
   renderProblemMixStandalone(rows);
   renderTrend();
   renderTable(rows);
+  if (S.view === 'action') renderActionList();
 }
 
 // ============================================================
