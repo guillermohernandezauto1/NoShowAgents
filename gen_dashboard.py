@@ -1355,17 +1355,7 @@ function renderActionList() {
   const q = (document.getElementById('action-search')?.value || '').toLowerCase();
   const countries = S.countries;
 
-  // 60-day window: compare YYYY-MM-DD strings (lexicographic sort works for ISO dates)
-  const now = new Date();
-  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 60);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const cutoffLabel = cutoff.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-  const nowLabel    = now.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-  const badge = document.getElementById('action-date-badge');
-  if (badge) badge.textContent = `Last 60 days (${cutoffLabel} – ${nowLabel})`;
-
   let data = STOCK.filter(r => {
-    if (r.date < cutoffStr) return false;
     if (countries.length && !countries.includes(r.country)) return false;
     if (q && !r.lead_id.toLowerCase().includes(q) && !r.problem.toLowerCase().includes(q)) return false;
     return true;
