@@ -71,14 +71,22 @@ _REASON_LABELS = {
     'reason_not_found_branch':'Could not find branch', 'reason_duplication':'Duplication',
     'reason_appt_took_place':'Appointment took place', 'reason_other':'Other'
 }
+_PB_LABELS = {
+    'pb_sent_away_docs':'Sent Away (Docs)', 'pb_eval_rejected':'Eval Rejected',
+    'pb_unfriendly':'Unfriendly', 'pb_employee_late':'Employee Late',
+    'pb_price_no_eval':'Price/No Eval', 'pb_eval_sell_commit':'Sell Commitment',
+    'pb_disagree_process':'Disagree Process', 'pb_other':'Other'
+}
 def load_stock(path):
     with open(path, newline='', encoding='utf-8-sig') as f:
         rows = list(csv.DictReader(f))
     out = []
     for r in rows:
         reasons = [lbl for col, lbl in _REASON_LABELS.items() if r.get(col,'0').split('.')[0] == '1']
-        out.append({'country': r['country'], 'date': r['date'],
-                    'lead_id': r['lead_id'], 'problem': reasons[0] if reasons else '—'})
+        subreasons = [lbl for col, lbl in _PB_LABELS.items() if r.get(col,'0').split('.')[0] == '1']
+        out.append({'country': r['country'], 'date': r['date'], 'lead_id': r['lead_id'],
+                    'problem': reasons[0] if reasons else '—',
+                    'subreason': subreasons[0] if subreasons else ''})
     return out
 stock_data = load_stock(STOCK_PATH) if os.path.exists(STOCK_PATH) else []
 
@@ -573,6 +581,7 @@ header .tabs .tab-btn{font-size:14px;padding:10px 24px}
           <th onclick="sortAction('date')">Call date <span class="si">↕</span></th>
           <th onclick="sortAction('lead_id')">Lead ID <span class="si">↕</span></th>
           <th onclick="sortAction('problem')">Customer feedback <span class="si">↕</span></th>
+          <th onclick="sortAction('subreason')">Subreason <span class="si">↕</span></th>
         </tr></thead>
         <tbody id="action-body"></tbody>
       </table>
@@ -1379,7 +1388,7 @@ function renderActionList() {
   const tbody = document.getElementById('action-body');
   if (!tbody) return;
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:24px;opacity:.4;font-size:12px">No records match current filters</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;opacity:.4;font-size:12px">No records match current filters</td></tr>`;
   } else {
     const badge = c => `<span class="badge" style="background:${h2r(CCOLOR[c]||'#888',.12)};color:${CCOLOR[c]||'#888'}">${c}</span>`;
     tbody.innerHTML = data.map(d => `<tr>
@@ -1387,6 +1396,7 @@ function renderActionList() {
       <td style="font-size:12px">${d.date}</td>
       <td><code style="font-size:12px;background:rgba(128,128,128,.08);padding:1px 5px;border-radius:3px">${d.lead_id}</code></td>
       <td style="font-size:12px">${d.problem}</td>
+      <td style="font-size:12px;opacity:${d.subreason ? '1' : '.35'}">${d.subreason || '—'}</td>
     </tr>`).join('');
   }
 
@@ -1417,8 +1427,8 @@ function downloadActionCSV() {
     return av < bv ? -actionSort.dir : av > bv ? actionSort.dir : 0;
   });
   const escape = v => `"${String(v).replace(/"/g, '""')}"`;
-  const lines = ['Country,Call date,Lead ID,Customer feedback'];
-  data.forEach(r => lines.push([r.country, r.date, r.lead_id, r.problem].map(escape).join(',')));
+  const lines = ['Country,Call date,Lead ID,Customer feedback,Subreason'];
+  data.forEach(r => lines.push([r.country, r.date, r.lead_id, r.problem, r.subreason||''].map(escape).join(',')));
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
